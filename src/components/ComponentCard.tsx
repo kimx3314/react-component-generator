@@ -15,16 +15,24 @@ type Tab = 'preview' | 'code';
 export function ComponentCard({ component, onRemove, onRegenerate, isLoading }: ComponentCardProps) {
   const [activeTab, setActiveTab] = useState<Tab>('preview');
   const [previewKey, setPreviewKey] = useState(0);
+  const createdAt = component.createdAt.toLocaleTimeString('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
   return (
     <div className="component-card">
       <div className="card-header">
-        <p className="card-prompt">{component.prompt}</p>
+        <div className="card-title-group">
+          <span>{createdAt}</span>
+          <p className="card-prompt">{component.prompt}</p>
+        </div>
         <div className="card-actions">
           <button
             className="btn-refresh"
             onClick={() => setPreviewKey((k) => k + 1)}
             title="미리보기 새로고침"
+            aria-label="미리보기 새로고침"
           >
             ↻
           </button>
