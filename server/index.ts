@@ -1,4 +1,8 @@
 import { stripCodeFences, ensureRenderCall } from './generator';
+import { withModelFallback } from './fallback';
+
+// 우선순위 순서. 앞 모델이 실패하면 다음 모델로 폴백한다.
+const GOOGLE_MODELS = ['gemini-3.1-flash-lite', 'gemini-3.5-flash'];
 
 const SYSTEM_PROMPT = `You are a React component generator. Generate a single React component based on the user's description.
 
@@ -91,8 +95,7 @@ async function callAnthropic(prompt: string, apiKey: string): Promise<string> {
     .join('');
 }
 
-async function callGoogle(prompt: string, apiKey: string): Promise<string> {
-  const model = 'gemini-2.5-flash';
+async function callGoogleModel(prompt: string, apiKey: string, model: string): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const response = await fetch(url, {
@@ -126,6 +129,10 @@ async function callGoogle(prompt: string, apiKey: string): Promise<string> {
       ?.map((part) => part.text)
       ?.join('') ?? ''
   );
+}
+
+async function callGoogle(prompt: string, apiKey: string): Promise<string> {
+  return withModelFallback(GOOGLE_MODELS, (model) => callGoogleModel(prompt, apiKey, model));
 }
 
 const server = Bun.serve({
