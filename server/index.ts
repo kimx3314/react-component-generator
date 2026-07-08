@@ -1,3 +1,5 @@
+import { stripCodeFences, ensureRenderCall } from './generator';
+
 const SYSTEM_PROMPT = `You are a React component generator. Generate a single React component based on the user's description.
 
 Rules:
@@ -124,23 +126,6 @@ async function callGoogle(prompt: string, apiKey: string): Promise<string> {
       ?.map((part) => part.text)
       ?.join('') ?? ''
   );
-}
-
-function stripCodeFences(text: string): string {
-  return text
-    .replace(/^```(?:jsx|tsx|javascript|typescript)?\n?/gm, '')
-    .replace(/```$/gm, '')
-    .trim();
-}
-
-function ensureRenderCall(code: string): string {
-  if (/\brender\s*\(/.test(code)) return code;
-
-  const match = code.match(/(?:const|function)\s+([A-Z]\w+)/);
-  if (match) {
-    return `${code}\n\nrender(<${match[1]} />);`;
-  }
-  return code;
 }
 
 const server = Bun.serve({
