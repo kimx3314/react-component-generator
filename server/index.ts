@@ -92,7 +92,7 @@ async function callAnthropic(prompt: string, apiKey: string): Promise<string> {
 }
 
 async function callGoogle(prompt: string, apiKey: string): Promise<string> {
-  const model = 'gemini-2.5-flash';
+  const model = 'gemini-3.1-flash-lite';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const response = await fetch(url, {
