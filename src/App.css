@@ -584,6 +584,8 @@
   align-items: center;
   padding: 13px 18px;
   border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .panel-header h3 {
@@ -592,9 +594,69 @@
   font-weight: 750;
 }
 
+.responsive-toolbar {
+  display: flex;
+  gap: 6px;
+}
+
+.viewport-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.viewport-btn:hover {
+  background: var(--surface-muted);
+  border-color: #94a3b8;
+  color: var(--text);
+}
+
+.viewport-btn--active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+
+.viewport-icon {
+  display: inline-block;
+  font-size: 0.9rem;
+}
+
+.viewport-label {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .viewport-label {
+    display: inline;
+  }
+}
+
 .preview-content {
   padding: 18px;
   background: #ffffff;
+}
+
+.preview-viewport-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 320px;
+  overflow-x: auto;
 }
 
 .preview-render {
@@ -610,6 +672,7 @@
   background-size: 28px 28px;
   border: 1px solid var(--line);
   border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .preview-error {
