@@ -1,0 +1,23 @@
+{
+  "skill_name": "create-pr",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "현재 변경사항을 분석해서 PR을 생성해줄 수 있어? 이미 푸시했어",
+      "expected_output": "git 상태 확인 후 커밋 메시지에서 제목 추출, 템플릿 기반 본문 작성, gh pr create로 PR 생성, PR URL 반환",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "이 feature 브랜치의 변경사항으로 PR을 만들어줘",
+      "expected_output": "현재 브랜치의 커밋들을 base 브랜치와 비교, PR 제목과 본문 자동 생성, PR URL 반환",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "아직 푸시 안 한 변경사항이 있는데 PR 생성할 수 있어?",
+      "expected_output": "git status로 확인 후 푸시되지 않은 변경이 있다는 오류 메시지 반환, 사용자에게 먼저 푸시하라고 안내",
+      "files": []
+    }
+  ]
+}
