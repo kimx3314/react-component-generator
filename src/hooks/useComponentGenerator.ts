@@ -1,11 +1,22 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { GeneratedComponent, Provider } from '../types';
 
+interface StreamEvent {
+  type: 'chunk' | 'done' | 'error';
+  text?: string;
+  code?: string;
+  message?: string;
+}
+
 interface UseComponentGeneratorReturn {
   components: GeneratedComponent[];
   isLoading: boolean;
+  isStreaming: boolean;
+  streamingCode: string;
   error: string | null;
   generate: (prompt: string, apiKey: string | undefined, provider: Provider) => Promise<void>;
+  streamGenerate: (prompt: string, apiKey: string | undefined, provider: Provider) => Promise<void>;
+  cancelStream: () => void;
   removeComponent: (id: string) => void;
   clearAll: () => void;
 }
@@ -49,7 +60,10 @@ function saveComponentsToStorage(components: GeneratedComponent[]): void {
 export function useComponentGenerator(): UseComponentGeneratorReturn {
   const [components, setComponents] = useState<GeneratedComponent[]>(() => loadComponentsFromStorage());
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingCode, setStreamingCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
 
   useEffect(() => {
     if (components.length === 0) {
@@ -92,6 +106,96 @@ export function useComponentGenerator(): UseComponentGeneratorReturn {
     }
   }, []);
 
+  const streamGenerate = useCallback(
+    async (prompt: string, apiKey: string | undefined, provider: Provider) => {
+      setIsStreaming(true);
+      setStreamingCode('');
+      setError(null);
+
+      const controller = new AbortController();
+      setAbortController(controller);
+
+      try {
+        const res = await fetch('/api/generate-stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt, ...(apiKey && { apiKey }), provider }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || 'Failed to stream component');
+        }
+
+        const reader = res.body?.getReader();
+        if (!reader) throw new Error('Response body not readable');
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let fullCode = '';
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+
+            for (let i = 0; i < lines.length - 1; i++) {
+              const line = lines[i].trim();
+              if (!line) continue;
+
+              try {
+                const event: StreamEvent = JSON.parse(line);
+
+                if (event.type === 'chunk' && event.text) {
+                  setStreamingCode((prev) => prev + event.text!);
+                } else if (event.type === 'done' && event.code) {
+                  fullCode = event.code;
+                  const newComponent: GeneratedComponent = {
+                    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                    prompt,
+                    code: fullCode,
+                    createdAt: new Date(),
+                  };
+                  setComponents((prev) => [newComponent, ...prev]);
+                } else if (event.type === 'error') {
+                  throw new Error(event.message || 'Streaming error');
+                }
+              } catch (parseErr) {
+                // JSON 파싱 실패는 무시
+              }
+            }
+
+            buffer = lines[lines.length - 1];
+          }
+        } finally {
+          reader.releaseLock();
+        }
+      } catch (err) {
+        if (err instanceof Error && err.name !== 'AbortError') {
+          const message = err instanceof Error ? err.message : 'Unknown error';
+          setError(message);
+        }
+      } finally {
+        setIsStreaming(false);
+        setAbortController(null);
+      }
+    },
+    []
+  );
+
+  const cancelStream = useCallback(() => {
+    if (abortController) {
+      abortController.abort();
+      setAbortController(null);
+    }
+    setIsStreaming(false);
+    setStreamingCode('');
+  }, [abortController]);
+
   const removeComponent = useCallback((id: string) => {
     setComponents((prev) => prev.filter((c) => c.id !== id));
   }, []);
@@ -100,5 +204,16 @@ export function useComponentGenerator(): UseComponentGeneratorReturn {
     setComponents([]);
   }, []);
 
-  return { components, isLoading, error, generate, removeComponent, clearAll };
+  return {
+    components,
+    isLoading,
+    isStreaming,
+    streamingCode,
+    error,
+    generate,
+    streamGenerate,
+    cancelStream,
+    removeComponent,
+    clearAll,
+  };
 }

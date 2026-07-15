@@ -18,8 +18,19 @@ function App() {
     anthropic: false,
     google: false,
   });
-  const { components, isLoading, error, generate, removeComponent, clearAll } =
-    useComponentGenerator();
+  const {
+    components,
+    isLoading,
+    isStreaming,
+    streamingCode,
+    error,
+    generate,
+    streamGenerate,
+    cancelStream,
+    removeComponent,
+    clearAll,
+  } = useComponentGenerator();
+  const [useStreaming, setUseStreaming] = useState(true);
 
   useEffect(() => {
     fetch('/api/config')
@@ -35,7 +46,11 @@ function App() {
       alert(`${PROVIDER_CONFIG[provider].label} API 키를 입력하거나 .env에 설정해주세요.`);
       return;
     }
-    generate(prompt, apiKey || undefined, provider);
+    if (useStreaming) {
+      streamGenerate(prompt, apiKey || undefined, provider);
+    } else {
+      generate(prompt, apiKey || undefined, provider);
+    }
   };
 
   const handleProviderChange = (newProvider: Provider) => {
@@ -68,7 +83,7 @@ function App() {
 
       <main className="workspace">
         <section className="composer-panel" aria-label="컴포넌트 생성">
-          <PromptInput onGenerate={handleGenerate} isLoading={isLoading} />
+          <PromptInput onGenerate={handleGenerate} isLoading={isLoading || isStreaming} />
         </section>
 
         <aside className="settings-panel" aria-label="실행 설정">
@@ -118,6 +133,22 @@ function App() {
               {hasEnvKey ? '.env 키가 연결되어 있습니다.' : '직접 입력하거나 서버 환경변수를 설정하세요.'}
             </p>
           </div>
+          <div className="streaming-toggle">
+            <label htmlFor="use-streaming">
+              <input
+                id="use-streaming"
+                type="checkbox"
+                checked={useStreaming}
+                onChange={(e) => setUseStreaming(e.target.checked)}
+              />
+              실시간 스트리밍 활성화
+            </label>
+            <p className="streaming-description">
+              {useStreaming
+                ? '생성 중인 코드를 실시간으로 표시합니다.'
+                : '생성 완료 후 전체 코드를 표시합니다.'}
+            </p>
+          </div>
         </aside>
       </main>
 
@@ -164,6 +195,27 @@ function App() {
           <div className="loading-card">
             <div className="loading-pulse" />
             <p>컴포넌트를 생성하고 있습니다...</p>
+          </div>
+        )}
+
+        {isStreaming && (
+          <div className="streaming-card">
+            <div className="streaming-header">
+              <div className="streaming-indicator">
+                <span className="pulse" />
+                실시간 생성 중...
+              </div>
+              <button className="btn-cancel" onClick={cancelStream}>
+                생성 중단
+              </button>
+            </div>
+            {streamingCode && (
+              <div className="streaming-code">
+                <pre>
+                  <code>{streamingCode}</code>
+                </pre>
+              </div>
+            )}
           </div>
         )}
 

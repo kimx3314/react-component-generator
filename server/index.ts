@@ -1,5 +1,6 @@
 import { stripCodeFences, ensureRenderCall } from './generator';
 import { withModelFallback } from './fallback';
+import { streamAnthropic, streamGoogle, type StreamEvent } from './streaming';
 
 // 우선순위 순서. 앞 모델이 실패하면 다음 모델로 폴백한다.
 const GOOGLE_MODELS = ['gemini-3.1-flash-lite', 'gemini-3.5-flash'];
@@ -210,6 +211,75 @@ const server = Bun.serve({
           { status: 500, headers: CORS_HEADERS }
         );
       }
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/generate-stream') {
+      const encoder = new TextEncoder();
+
+      const stream = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          try {
+            const { prompt, apiKey, provider = 'anthropic' } = (await req.json()) as {
+              prompt: string;
+              apiKey?: string;
+              provider?: Provider;
+            };
+
+            const resolvedKey = resolveApiKey(provider, apiKey);
+
+            if (!resolvedKey) {
+              const error: StreamEvent = {
+                type: 'error',
+                message: `API key is required. Set ${provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'GOOGLE_API_KEY'} in .env or enter it manually.`,
+              };
+              controller.enqueue(encoder.encode(JSON.stringify(error) + '\n'));
+              controller.close();
+              return;
+            }
+
+            if (!prompt) {
+              const error: StreamEvent = {
+                type: 'error',
+                message: 'Prompt is required',
+              };
+              controller.enqueue(encoder.encode(JSON.stringify(error) + '\n'));
+              controller.close();
+              return;
+            }
+
+            const onChunk = (chunk: string) => {
+              const event: StreamEvent = { type: 'chunk', text: chunk };
+              controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'));
+            };
+
+            const code =
+              provider === 'google'
+                ? await streamGoogle(prompt, resolvedKey, onChunk)
+                : await streamAnthropic(prompt, resolvedKey, onChunk);
+
+            const done: StreamEvent = { type: 'done', code };
+            controller.enqueue(encoder.encode(JSON.stringify(done) + '\n'));
+            controller.close();
+          } catch (err) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+
+            const error: StreamEvent = {
+              type: 'error',
+              message,
+            };
+            controller.enqueue(encoder.encode(JSON.stringify(error) + '\n'));
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          ...CORS_HEADERS,
+        },
+      });
     }
 
     return Response.json(
