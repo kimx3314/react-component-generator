@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(.env*)", "Read(*credentials*)", "Read(*secrets*)", "Bash(cat .env*)", "Bash(cat *secrets*)"
+    ],
+    "allow": [
+      "Skill(run)", "PowerShell(Get-Process *)"
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash ./.claude/scripts/char-counter.sh",
+    "refreshInterval": 2
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ./.claude/hooks/tdd-reminder.sh",
+            "if": "Write(*.ts)|Write(*.tsx)|Edit(*.ts)|Edit(*.tsx)",
+            "statusMessage": "TDD 규칙 상기 중..."
+          }
+        ]
+      }
+    ]
+  }
+}
