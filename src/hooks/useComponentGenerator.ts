@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { GeneratedComponent, Provider } from '../types';
 
 interface UseComponentGeneratorReturn {
@@ -10,10 +10,54 @@ interface UseComponentGeneratorReturn {
   clearAll: () => void;
 }
 
+const STORAGE_KEY = 'rcg_components';
+const MAX_COMPONENTS = 3;
+
+function loadComponentsFromStorage(): GeneratedComponent[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return [];
+
+    const parsed = JSON.parse(stored) as Array<{
+      id: string;
+      prompt: string;
+      code: string;
+      createdAt: string;
+    }>;
+
+    return parsed.map(c => ({
+      ...c,
+      createdAt: new Date(c.createdAt),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function saveComponentsToStorage(components: GeneratedComponent[]): void {
+  try {
+    const toStore = components.slice(0, MAX_COMPONENTS).map(c => ({
+      ...c,
+      createdAt: c.createdAt.toISOString(),
+    }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
+  } catch {
+    // localStorage full or unavailable, silently fail
+  }
+}
+
 export function useComponentGenerator(): UseComponentGeneratorReturn {
-  const [components, setComponents] = useState<GeneratedComponent[]>([]);
+  const [components, setComponents] = useState<GeneratedComponent[]>(() => loadComponentsFromStorage());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (components.length === 0) {
+      localStorage.removeItem(STORAGE_KEY);
+    } else {
+      saveComponentsToStorage(components);
+    }
+  }, [components]);
 
   const generate = useCallback(async (prompt: string, apiKey: string | undefined, provider: Provider) => {
     setIsLoading(true);
