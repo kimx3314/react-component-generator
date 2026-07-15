@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { GeneratedComponent, Provider } from '../types';
 
 interface StreamEvent {
@@ -63,7 +63,7 @@ export function useComponentGenerator(): UseComponentGeneratorReturn {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingCode, setStreamingCode] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (components.length === 0) {
@@ -108,12 +108,15 @@ export function useComponentGenerator(): UseComponentGeneratorReturn {
 
   const streamGenerate = useCallback(
     async (prompt: string, apiKey: string | undefined, provider: Provider) => {
+      // 이전 요청 취소
+      abortControllerRef.current?.abort();
+
       setIsStreaming(true);
       setStreamingCode('');
       setError(null);
 
       const controller = new AbortController();
-      setAbortController(controller);
+      abortControllerRef.current = controller;
 
       try {
         const res = await fetch('/api/generate-stream', {
@@ -151,7 +154,7 @@ export function useComponentGenerator(): UseComponentGeneratorReturn {
                 const event: StreamEvent = JSON.parse(line);
 
                 if (event.type === 'chunk' && event.text) {
-                  setStreamingCode((prev) => prev + event.text!);
+                  setStreamingCode((prev) => prev + event.text);
                 } else if (event.type === 'done' && event.code) {
                   fullCode = event.code;
                   const newComponent: GeneratedComponent = {
@@ -180,21 +183,21 @@ export function useComponentGenerator(): UseComponentGeneratorReturn {
           setError(message);
         }
       } finally {
+        if (abortControllerRef.current === controller) {
+          abortControllerRef.current = null;
+        }
         setIsStreaming(false);
-        setAbortController(null);
       }
     },
     []
   );
 
   const cancelStream = useCallback(() => {
-    if (abortController) {
-      abortController.abort();
-      setAbortController(null);
-    }
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
     setIsStreaming(false);
     setStreamingCode('');
-  }, [abortController]);
+  }, []);
 
   const removeComponent = useCallback((id: string) => {
     setComponents((prev) => prev.filter((c) => c.id !== id));
